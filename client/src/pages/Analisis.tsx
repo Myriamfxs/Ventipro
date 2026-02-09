@@ -34,7 +34,7 @@ const METRICA_LABELS: Record<string, string> = {
   margenPorAnimal: "Margen por Animal (€)",
   margenPorPlazaDia: "Margen por Plaza/Día (€)",
   rentabilidadPct: "Rentabilidad (%)",
-  precioKg: "Precio por Kg (€)",
+  precioKg: "Precio de Venta (€)",
 };
 
 function formatCurrency(value: number | string | null | undefined): string {

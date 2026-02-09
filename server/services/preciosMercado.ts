@@ -244,14 +244,16 @@ export async function obtenerPreciosActuales(): Promise<PrecioMercado[]> {
   }
 
   // Precio estimado del lechón 5-7kg (derivado del de 20kg)
+  // Los lechones de 5-7kg se venden POR UNIDAD, no por kg
+  // Ratio típico: un lechón de 6kg vale aprox. 55-65% del precio de un lechón de 20kg
   if (ultimoLechon) {
-    const precioLechon7kg = (ultimoLechon.precio / 20) * 7 * 1.15; // Premium del 15% por lechón pequeño
+    const precioLechon57 = Math.round(ultimoLechon.precio * 0.60 * 100) / 100; // ~60% del precio del lechón 20kg
     precios.push({
       fuente: "Estimado (ref. Mercolleida)",
       mercado: "España",
       producto: "Lechón 5-7 kg",
-      precio: Math.round(precioLechon7kg * 100) / 100,
-      unidad: "€/kg vivo",
+      precio: precioLechon57,
+      unidad: "€/unidad",
       fecha: ultimoLechon.fecha,
       tendencia: variacionLechon > 0.5 ? "alza" : variacionLechon < -0.5 ? "baja" : "estable",
     });

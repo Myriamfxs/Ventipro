@@ -80,24 +80,30 @@ function NuevaOfertaForm({
     escenario: "5-7kg",
     numAnimales: "",
     pesoEstimado: "6",
-    precioKg: "3.50",
+    precioKg: "10.20",
     condiciones: "",
   });
 
-  // Auto-adjust peso based on escenario
+  // Determinar si el precio es por unidad o por kg
+  const esPorUnidad = form.escenario === "5-7kg" || form.escenario === "20-21kg";
+
+  // Auto-adjust peso and precio based on escenario
+  // Lechones 5-7kg y 20kg: precio POR UNIDAD
+  // Cebo: precio POR KG VIVO
   const handleEscenarioChange = (v: string) => {
     let peso = "6";
-    let precio = "3.50";
-    if (v === "20-21kg") { peso = "20.5"; precio = "2.80"; }
-    else if (v === "cebo") { peso = "105"; precio = "1.45"; }
+    let precio = "10.20"; // €/unidad para 5-7kg
+    if (v === "20-21kg") { peso = "20.5"; precio = "17.00"; } // €/unidad
+    else if (v === "cebo") { peso = "105"; precio = "1.00"; } // €/kg vivo
     setForm({ ...form, escenario: v, pesoEstimado: peso, precioKg: precio });
   };
 
-  const precioTotal = (
-    parseFloat(form.pesoEstimado || "0") *
-    parseFloat(form.precioKg || "0") *
-    parseInt(form.numAnimales || "0")
-  ).toFixed(2);
+  // Cálculo del precio total:
+  // Lechones (5-7kg, 20-21kg): precio es POR UNIDAD, no se multiplica por peso
+  // Cebo: precio es POR KG VIVO, se multiplica por peso
+  const precioTotal = esPorUnidad
+    ? (parseFloat(form.precioKg || "0") * parseInt(form.numAnimales || "0")).toFixed(2)
+    : (parseFloat(form.pesoEstimado || "0") * parseFloat(form.precioKg || "0") * parseInt(form.numAnimales || "0")).toFixed(2);
 
   return (
     <div className="space-y-4">
@@ -173,7 +179,7 @@ function NuevaOfertaForm({
           />
         </div>
         <div className="space-y-2">
-          <Label>Precio (€/kg)</Label>
+          <Label>{esPorUnidad ? "Precio (€/unidad)" : "Precio (€/kg vivo)"}</Label>
           <Input
             type="number"
             step="0.01"

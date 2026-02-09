@@ -72,3 +72,14 @@
 - [x] Filtros interactivos por rango de fechas, escenario y número de animales
 - [x] Integrar la nueva sección en la navegación del sidebar
 - [x] Tests vitest para las queries y lógica del análisis histórico (10 tests)
+
+## Bugs - Corrección Precios
+- [x] Fix: Lechones 5-7kg se venden por UNIDAD, no por kg vivo - corregido en todo el sistema
+- [x] Fix: Lechones 20kg se venden por UNIDAD, no por kg - corregido en todo el sistema
+- [x] Fix: Verificar precios reales de mercado actuales para lechones (€/unidad) y cerdo cebado (€/kg vivo)
+- [x] Fix: Actualizar servicio de precios de mercado con unidades correctas
+- [x] Fix: Actualizar calculadora de rentabilidad con lógica de precios por unidad
+- [x] Fix: Actualizar dashboard y frontend con etiquetas de unidad correctas
+- [x] Fix: Actualizar HTML de ofertas comerciales con unidad correcta (€/unidad vs €/kg vivo)
+- [x] Fix: Actualizar cálculo de precio total en ofertas (lechones: precio*animales, cebo: precio*peso*animales)
+- [x] Tests actualizados: 48 tests, 100% pass

@@ -69,8 +69,8 @@ function generarHtmlOferta(oferta: any, cliente: any, lote: any): string {
           <span class="detail-value">${oferta.pesoEstimado} kg/animal</span>
         </div>
         <div class="detail-row">
-          <span class="detail-label">Precio por kg</span>
-          <span class="detail-value">${oferta.precioKg} €/kg</span>
+          <span class="detail-label">Precio ${oferta.escenario === "cebo" ? "por kg vivo" : "por unidad"}</span>
+          <span class="detail-value">${oferta.precioKg} ${oferta.escenario === "cebo" ? "€/kg vivo" : "€/unidad"}</span>
         </div>
         ${oferta.fechaDisponibilidad ? `<div class="detail-row">
           <span class="detail-label">Disponibilidad</span>
@@ -139,7 +139,13 @@ export const ofertasRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const codigo = generarCodigoOferta();
-      const precioTotal = (parseFloat(input.pesoEstimado) * parseFloat(input.precioKg) * input.numAnimales).toFixed(2);
+      // Lechones (5-7kg, 20-21kg): precio es POR UNIDAD, no se multiplica por peso
+      // Cebo: precio es POR KG VIVO, se multiplica por peso
+      const esPorUnidad = input.escenario === "5-7kg" || input.escenario === "20-21kg";
+      const precioTotal = esPorUnidad
+        ? (parseFloat(input.precioKg) * input.numAnimales).toFixed(2)
+        : (parseFloat(input.pesoEstimado) * parseFloat(input.precioKg) * input.numAnimales).toFixed(2);
+      const unidadPrecio = esPorUnidad ? "€/unidad" : "€/kg vivo";
 
       // Generate offer text with LLM
       let textoOferta = "";
@@ -148,7 +154,7 @@ export const ofertasRouter = router({
         const llmResult = await invokeLLM({
           messages: [
             { role: "system", content: "Eres un asistente comercial de una explotación porcina profesional. Genera textos de oferta comercial breves, profesionales y en español." },
-            { role: "user", content: `Genera un texto breve de oferta comercial para el cliente "${cliente?.nombre || "Cliente"}" (empresa: ${cliente?.empresa || "N/A"}) para la venta de ${input.numAnimales} animales de tipo ${input.escenario} a ${input.precioKg} €/kg con peso estimado de ${input.pesoEstimado} kg. Precio total: ${precioTotal} €. ${input.condiciones ? "Condiciones: " + input.condiciones : ""}. Máximo 3 párrafos.` },
+            { role: "user", content: `Genera un texto breve de oferta comercial para el cliente "${cliente?.nombre || "Cliente"}" (empresa: ${cliente?.empresa || "N/A"}) para la venta de ${input.numAnimales} animales de tipo ${input.escenario} a ${input.precioKg} ${unidadPrecio} con peso estimado de ${input.pesoEstimado} kg. Precio total: ${precioTotal} €. ${input.condiciones ? "Condiciones: " + input.condiciones : ""}. Máximo 3 párrafos.` },
           ],
         });
         textoOferta = typeof llmResult.choices[0]?.message?.content === "string"
@@ -156,7 +162,7 @@ export const ofertasRouter = router({
           : "";
       } catch (e) {
         console.warn("LLM generation failed, using default text:", e);
-        textoOferta = `Oferta comercial ${codigo} para ${input.numAnimales} animales (${input.escenario}) a ${input.precioKg} €/kg. Total estimado: ${precioTotal} €.`;
+        textoOferta = `Oferta comercial ${codigo} para ${input.numAnimales} animales (${input.escenario}) a ${input.precioKg} ${unidadPrecio}. Total estimado: ${precioTotal} €.`;
       }
 
       const result = await createOferta({

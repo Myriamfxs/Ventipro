@@ -21,7 +21,8 @@ type EscenarioResult = {
   nombre: string;
   escenario: string;
   pesoVenta: number;
-  precioKg: number;
+  precioVenta: number;       // Precio de venta (€/unidad para lechones, €/kg para cebo)
+  unidadPrecio: string;      // "€/unidad" o "€/kg vivo"
   precioFuente: string;
   ingresosPorAnimal: number;
   ingresosTotales: number;
@@ -104,26 +105,29 @@ function calcularEscenarioMejorado(
   preciosMercado: { cebado?: number; lechon20?: number; lechon7?: number },
   usarCostesEstimados: boolean,
 ): EscenarioResult {
-  let pesoVenta: number, precioKg: number, precioFuente: string;
+  let pesoVenta: number, precioVenta: number, unidadPrecio: string, precioFuente: string;
   let costeFaseCria: number, costeFaseTransicion: number, costeFaseCebo: number;
   let costePiensoTotal: number, costeSanidadTotal: number, costeFijosTotal: number;
   let mortalidadPct: number, diasOcupacion: number, nombre: string;
+  let ingresosPorAnimalCalc: number;
 
   switch (escenario) {
     case "5-7kg": {
       nombre = "Venta Lechón 5-7 kg";
       pesoVenta = 7;
+      unidadPrecio = "€/unidad";
       diasOcupacion = usarCostesEstimados ? COSTES_ESTANDAR.cria.dias : (params?.diasEstancia5_7 || 28);
 
-      // Precio: mercado > parámetros > estándar
+      // Precio POR UNIDAD: mercado > parámetros > estándar
+      // Los lechones de 5-7kg se venden por unidad, NO por kg
       if (preciosMercado.lechon7) {
-        precioKg = preciosMercado.lechon7;
+        precioVenta = preciosMercado.lechon7; // Ya viene en €/unidad
         precioFuente = "Mercado (estimado ref. Mercolleida)";
       } else if (params?.precioVenta5_7) {
-        precioKg = parseFloat(params.precioVenta5_7);
+        precioVenta = parseFloat(params.precioVenta5_7); // €/unidad
         precioFuente = "Parámetros manuales";
       } else {
-        precioKg = 3.50;
+        precioVenta = 10.20; // ~10.20 €/unidad estándar (60% de 17€ lechón 20kg)
         precioFuente = "Estándar del sector";
       }
 
@@ -150,19 +154,20 @@ function calcularEscenarioMejorado(
     case "20-21kg": {
       nombre = "Venta Transición 20-21 kg";
       pesoVenta = 21;
+      unidadPrecio = "€/unidad";
       diasOcupacion = usarCostesEstimados
         ? COSTES_ESTANDAR.cria.dias + COSTES_ESTANDAR.transicion.dias
         : (params?.diasEstancia20_21 || 65);
 
+      // Precio POR UNIDAD: los lechones de 20kg se venden por unidad
       if (preciosMercado.lechon20) {
-        // Precio lechón 20kg se da por unidad, convertir a €/kg
-        precioKg = preciosMercado.lechon20 / 20;
+        precioVenta = preciosMercado.lechon20; // Ya viene en €/unidad
         precioFuente = "Mercado (Mercolleida)";
       } else if (params?.precioVenta20_21) {
-        precioKg = parseFloat(params.precioVenta20_21);
+        precioVenta = parseFloat(params.precioVenta20_21); // €/unidad
         precioFuente = "Parámetros manuales";
       } else {
-        precioKg = 2.80;
+        precioVenta = 17.00; // ~17 €/unidad estándar Mercolleida
         precioFuente = "Estándar del sector";
       }
 
@@ -190,18 +195,20 @@ function calcularEscenarioMejorado(
     case "cebo": {
       nombre = "Cebo Final 100-110 kg";
       pesoVenta = 110;
+      unidadPrecio = "€/kg vivo";
       diasOcupacion = usarCostesEstimados
         ? COSTES_ESTANDAR.cria.dias + COSTES_ESTANDAR.transicion.dias + COSTES_ESTANDAR.cebo.dias
         : (params?.diasEstanciaCebo || 160);
 
+      // Precio POR KG VIVO: el cerdo cebado se vende al peso
       if (preciosMercado.cebado) {
-        precioKg = preciosMercado.cebado;
+        precioVenta = preciosMercado.cebado; // €/kg vivo
         precioFuente = "Mercado (Mercolleida)";
       } else if (params?.precioVentaCebo) {
-        precioKg = parseFloat(params.precioVentaCebo);
+        precioVenta = parseFloat(params.precioVentaCebo); // €/kg vivo
         precioFuente = "Parámetros manuales";
       } else {
-        precioKg = 1.45;
+        precioVenta = 1.00; // 1.00 €/kg vivo actual Mercolleida
         precioFuente = "Estándar del sector";
       }
 
@@ -236,7 +243,16 @@ function calcularEscenarioMejorado(
 
   const animalesFinales = Math.round(numAnimales * (1 - mortalidadPct / 100));
   const mortalidadCoste = costeTotalPorAnimal * (mortalidadPct / 100);
-  const ingresosPorAnimal = pesoVenta * precioKg;
+
+  // INGRESOS: Para lechones (5-7kg y 20-21kg) el precio es POR UNIDAD
+  // Para cebo, el precio es POR KG VIVO (precio * peso)
+  if (escenario === "cebo") {
+    ingresosPorAnimalCalc = pesoVenta * precioVenta; // kg * €/kg
+  } else {
+    ingresosPorAnimalCalc = precioVenta; // €/unidad directamente
+  }
+
+  const ingresosPorAnimal = ingresosPorAnimalCalc;
   const ingresosTotales = ingresosPorAnimal * animalesFinales;
   const costesTotalesConMortalidad = (costeTotalPorAnimal + mortalidadCoste) * numAnimales;
   const margenPorAnimal = ingresosPorAnimal - costeTotalPorAnimal - mortalidadCoste;
@@ -257,7 +273,8 @@ function calcularEscenarioMejorado(
     nombre,
     escenario,
     pesoVenta,
-    precioKg: r(precioKg),
+    precioVenta: r(precioVenta),
+    unidadPrecio,
     precioFuente,
     ingresosPorAnimal: r(ingresosPorAnimal),
     ingresosTotales: r(ingresosTotales),
@@ -331,7 +348,7 @@ function generarRecomendacion(escenarios: EscenarioResult[], plazasCebo: number)
   }
 
   // Factor 6: Precio de mercado
-  factores.push(`Precio de venta: ${mejor.precioKg.toFixed(2)} €/kg (${mejor.precioFuente})`);
+  factores.push(`Precio de venta: ${mejor.precioVenta.toFixed(2)} ${mejor.unidadPrecio} (${mejor.precioFuente})`);
 
   // Alternativa
   let alternativa: string | undefined;
@@ -523,7 +540,7 @@ export const calculadoraRouter = router({
           userId: ctx.user.id,
           numAnimales: input.numAnimales,
           usaCostesEstimados: usarEstimados ? 1 : 0,
-          e57_precioKg: e57?.precioKg?.toString() || null,
+          e57_precioKg: e57?.precioVenta?.toString() || null,
           e57_ingresosPorAnimal: e57?.ingresosPorAnimal?.toString() || null,
           e57_costeTotalPorAnimal: e57?.costeTotalPorAnimal?.toString() || null,
           e57_margenPorAnimal: e57?.margenPorAnimal?.toString() || null,
@@ -532,7 +549,7 @@ export const calculadoraRouter = router({
           e57_rentabilidadPct: e57?.rentabilidadPct?.toString() || null,
           e57_mortalidadPct: e57?.mortalidadPct?.toString() || null,
           e57_viable: e57?.viable ? 1 : 0,
-          e2021_precioKg: e2021?.precioKg?.toString() || null,
+          e2021_precioKg: e2021?.precioVenta?.toString() || null,
           e2021_ingresosPorAnimal: e2021?.ingresosPorAnimal?.toString() || null,
           e2021_costeTotalPorAnimal: e2021?.costeTotalPorAnimal?.toString() || null,
           e2021_margenPorAnimal: e2021?.margenPorAnimal?.toString() || null,
@@ -541,7 +558,7 @@ export const calculadoraRouter = router({
           e2021_rentabilidadPct: e2021?.rentabilidadPct?.toString() || null,
           e2021_mortalidadPct: e2021?.mortalidadPct?.toString() || null,
           e2021_viable: e2021?.viable ? 1 : 0,
-          eCebo_precioKg: eCebo?.precioKg?.toString() || null,
+          eCebo_precioKg: eCebo?.precioVenta?.toString() || null,
           eCebo_ingresosPorAnimal: eCebo?.ingresosPorAnimal?.toString() || null,
           eCebo_costeTotalPorAnimal: eCebo?.costeTotalPorAnimal?.toString() || null,
           eCebo_margenPorAnimal: eCebo?.margenPorAnimal?.toString() || null,
